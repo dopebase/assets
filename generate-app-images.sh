@@ -66,6 +66,33 @@ get_alt_text() {
   echo "$alt"
 }
 
+# Rename image files that contain spaces by replacing spaces with hyphens
+rename_spaced_images() {
+  local folder="$1"
+
+  for ext in $IMAGE_EXTENSIONS; do
+    while IFS= read -r -d '' file; do
+      local base="$(basename "$file")"
+      local new_base="${base// /-}"
+      local new_path="$(dirname "$file")/$new_base"
+
+      # Skip if nothing would change
+      [ "$base" = "$new_base" ] && continue
+
+      if [ "$DRY_RUN" -eq 1 ]; then
+        echo "  DRY: Would rename: $base -> $new_base"
+      else
+        if [ -e "$new_path" ]; then
+          echo "  ! Skipping rename, target exists: $new_base"
+        else
+          mv "$file" "$new_path"
+          echo "  Renamed: $base -> $new_base"
+        fi
+      fi
+    done < <(find "$folder" -maxdepth 1 -type f -iname "*.$ext" -name "* *" -print0 2>/dev/null)
+  done
+}
+
 # Function to process an app folder
 process_app_folder() {
   local app_folder="$1"
@@ -73,6 +100,9 @@ process_app_folder() {
   local output_file="$app_folder/generated.html"
   
   echo "Processing: $app_name"
+
+  # Normalize filenames before scanning for images
+  rename_spaced_images "$app_folder"
   
   # Find all images, excluding those with "hero" in the name
   local images=()
